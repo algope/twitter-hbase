@@ -1,4 +1,4 @@
-package CloudComputing;
+package org.upm.hbase.twitterhbase;
 
 
 import java.io.BufferedReader;
