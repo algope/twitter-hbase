@@ -116,8 +116,8 @@ public class App {
             while (res != null && !res.isEmpty()) {
                 byte[] topic_bytes = res.getValue(Bytes.toBytes(lang), Bytes.toBytes("TOPIC"));
                 byte[] count_bytes = res.getValue(Bytes.toBytes(lang), Bytes.toBytes("COUNTS"));
-                String topic = Bytes.toString(topic_bytes).toString();
-                String count = Bytes.toString(count_bytes).toString();
+                String topic = Bytes.toString(topic_bytes);
+                String count = Bytes.toString(count_bytes);
                 getIntervalTopTopic().put(topic, (long) Integer.parseInt(count));
                 res = rs.next();
             }
@@ -185,11 +185,13 @@ public class App {
     private String[] extractLangsSource(String dataFolder) {
         File folder = new File(dataFolder);
         File[] listOfFiles = folder.listFiles();
+        assert listOfFiles != null;
         String[] langs = new String[listOfFiles.length];
         for (int i = 0; i < listOfFiles.length; i++) {
-            File file = listOfFiles[i];
+            File file;
+            file = listOfFiles[i];
             if (file.isFile() && file.getName().endsWith(".out")) {
-                langs[i] = file.getName().split(".out")[0].toString();
+                langs[i] = file.getName().split(".out")[0];
             }
         }
         return langs;
@@ -210,8 +212,8 @@ public class App {
                 // Instantiating table descriptor class
                 HTableDescriptor tableDescriptor = new HTableDescriptor(TableName.valueOf(thisTable));
                 // Adding column families to table descriptor
-                for (int i = 0; i < languages.length; i++) {
-                    tableDescriptor.addFamily(new HColumnDescriptor(languages[i]));
+                for (String language : languages) {
+                    tableDescriptor.addFamily(new HColumnDescriptor(language));
                 }
                 admin.createTable(tableDescriptor);
                 HConnection conn = HConnectionManager.createConnection(conf);
@@ -253,16 +255,15 @@ public class App {
         File folder = new File(dataFolder);
         File[] listOfFiles = folder.listFiles();
         //System.out.println("Number of files: " + listOfFiles.length);
-        for (int i = 0; i < listOfFiles.length; i++) {
-            File file = listOfFiles[i];
-            //System.out.println("Reading the file: " + file.getName());
+        assert listOfFiles != null;
+        //System.out.println("Reading the file: " + file.getName());
+        for (File file : listOfFiles)
             if (file.isFile() && file.getName().endsWith(".out")) {
 
                 try (BufferedReader br = new BufferedReader(new FileReader(file))) {
                     for (String line; (line = br.readLine()) != null; ) {
                         // process line by line
                         String[] fields = line.split(",");
-                        //System.out.println(line);
                         String timestamp = fields[0];
                         String lang = fields[1];
                         int pos = 2;
@@ -272,14 +273,10 @@ public class App {
                             topic_pos++;
                         }
                     }
-                    //System.out.println("Data sucessfully loaded");
-                } catch (NumberFormatException e) {
-                    e.printStackTrace();
-                } catch (IOException e) {
+                } catch (NumberFormatException | IOException e) {
                     e.printStackTrace();
                 }
             }
-        }
 
     }
 
@@ -294,33 +291,30 @@ public class App {
         else
             content = language + ", " + position + ", " + word + ", " + startTS + ", " + endTS;
 
-        BufferedWriter bw = null;
+        BufferedWriter bw;
         try {
             bw = new BufferedWriter(new FileWriter(file, true));
             bw.append(content);
             bw.newLine();
             bw.close();
-        } catch (FileNotFoundException ex) {
-            System.out.println(ex.getMessage());
         } catch (IOException ex) {
             System.out.println(ex.getMessage());
         }
-        // System.out.println("Write done");
     }
 
-    public HTable getTable() {
+    private HTable getTable() {
         return table;
     }
 
-    public void setTable(HTable table) {
+    private void setTable(HTable table) {
         this.table = table;
     }
 
-    public Map<String, Long> getIntervalTopTopic() {
+    private Map<String, Long> getIntervalTopTopic() {
         return intervalTopTopic;
     }
 
-    public void setIntervalTopTopic(Map<String, Long> intervalTopTopic) {
+    private void setIntervalTopTopic(Map<String, Long> intervalTopTopic) {
         this.intervalTopTopic = intervalTopTopic;
     }
 }
