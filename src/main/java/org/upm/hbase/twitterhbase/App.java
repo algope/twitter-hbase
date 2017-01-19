@@ -71,29 +71,18 @@ public class App {
         return key;
     }
 
-    /**
-     * Method to arrange lexicographically and rank results.
-     */
-    private List<Entry<String, Long>> arrangeMap(Map<String, Long> map) {
 
-        Set<Entry<String, Long>> set = map.entrySet();
-        List<Entry<String, Long>> list = new ArrayList<>(set);
-
-        Collections.sort(list, new HashtagComparator());
-
-        return list;
-    }
 
     /**
      * Method to arrange and print the query result
      */
     private void arrangeAndPrint(Map<String, Long> intervalTopTopic, String query, String lang, String start_timestamp, String end_timestamp, String output_folder, int N) {
         // Process the results and print them
-        List<Entry<String, Long>> intervalTopTopicList = this.arrangeMap(intervalTopTopic);
+        Set<Entry<String, Long>> set = intervalTopTopic.entrySet();
+        List<Entry<String, Long>> list = new ArrayList<>(set);
+        Collections.sort(list, new HashtagComparator());
         int position = 1;
-        //System.out.println("The length is : " + intervalTopTopicList.size());
-        for (Map.Entry<String, Long> entry : intervalTopTopicList) {
-            //System.out.println("The result for the first query is:" + "TOPIC: " + entry.getKey() +  " Position: " + position + "Count" + entry.getValue());
+        for (Map.Entry<String, Long> entry : list) {
             writeInOutputFile(query, lang, position, entry.getKey(), start_timestamp, end_timestamp, output_folder, entry.getValue().toString());
             if (position == N)
                 break;
@@ -164,7 +153,6 @@ public class App {
      * and end timestamp are in milliseconds.
      */
     private void thirdQuery(String start_timestamp, String end_timestamp, int N, String outputFolderPath) {
-        //System.out.println("Executing the query3");
         setIntervalTopTopic(new HashMap<String, Long>());
         String[] query_languages;
         try {
@@ -251,12 +239,9 @@ public class App {
      * Method to load the files in Hbase
      */
     private void load(String dataFolder) {
-        //System.out.println("Loading data into hbase");
         File folder = new File(dataFolder);
         File[] listOfFiles = folder.listFiles();
-        //System.out.println("Number of files: " + listOfFiles.length);
         assert listOfFiles != null;
-        //System.out.println("Reading the file: " + file.getName());
         for (File file : listOfFiles)
             if (file.isFile() && file.getName().endsWith(".out")) {
 
