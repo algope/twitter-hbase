@@ -16,7 +16,7 @@ import java.util.Map.Entry;
 
 public class App {
     private HTable table;
-    private Map<String, Long> intervalTopTopic;
+    private Map<String, Long> counters;
 
     public void main(String[] args) {
         if (args.length > 0) {
@@ -101,17 +101,17 @@ public class App {
             rs = getTable().getScanner(scan);
             Result res = rs.next();
             if (!query.equals("query3"))
-                setIntervalTopTopic(new HashMap<String, Long>());
+                setCounters(new HashMap<String, Long>());
             while (res != null && !res.isEmpty()) {
                 byte[] topic_bytes = res.getValue(Bytes.toBytes(lang), Bytes.toBytes("TOPIC"));
                 byte[] count_bytes = res.getValue(Bytes.toBytes(lang), Bytes.toBytes("COUNTS"));
                 String topic = Bytes.toString(topic_bytes);
                 String count = Bytes.toString(count_bytes);
-                getIntervalTopTopic().put(topic, (long) Integer.parseInt(count));
+                getCounters().put(topic, (long) Integer.parseInt(count));
                 res = rs.next();
             }
             if (!query.equals("query3"))
-                arrangeAndPrint(getIntervalTopTopic(), query, lang, start_timestamp, end_timestamp, out_folder_path, N);
+                arrangeAndPrint(getCounters(), query, lang, start_timestamp, end_timestamp, out_folder_path, N);
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -153,7 +153,7 @@ public class App {
      * and end timestamp are in milliseconds.
      */
     private void thirdQuery(String start_timestamp, String end_timestamp, int N, String outputFolderPath) {
-        setIntervalTopTopic(new HashMap<String, Long>());
+        setCounters(new HashMap<String, Long>());
         String[] query_languages;
         try {
             query_languages = new String[getTable().getTableDescriptor().getColumnFamilies().length];
@@ -164,7 +164,7 @@ public class App {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        arrangeAndPrint(getIntervalTopTopic(), "query3", null, start_timestamp, end_timestamp, outputFolderPath, N);
+        arrangeAndPrint(getCounters(), "query3", null, start_timestamp, end_timestamp, outputFolderPath, N);
     }
 
     /**
@@ -295,11 +295,11 @@ public class App {
         this.table = table;
     }
 
-    private Map<String, Long> getIntervalTopTopic() {
-        return intervalTopTopic;
+    private Map<String, Long> getCounters() {
+        return counters;
     }
 
-    private void setIntervalTopTopic(Map<String, Long> intervalTopTopic) {
-        this.intervalTopTopic = intervalTopTopic;
+    private void setCounters(Map<String, Long> counters) {
+        this.counters = counters;
     }
 }
