@@ -10,64 +10,42 @@ import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import java.io.*;
-import java.text.Collator;
 import java.util.*;
 import java.util.Map.Entry;
 
 
 public class App {
-    private static final String ID = "10";
-    private HBaseAdmin admin;
     private HTable table;
-    private String current_table;
-    private String[] all_languages;
-    private String[] query_languages;
     private Map<String, Long> intervalTopTopic;
 
-    /**
-     * Main method
-     *
-     * @param args Arguments: mode dataFolder startTS endTS N language outputFolder
-     * @throws java.lang.Exception
-     */
-    public static void main(String[] args) throws Exception {
-        org.apache.log4j.BasicConfigurator.configure();
-        int mode = 0;
+    public void main(String[] args) {
         if (args.length > 0) {
-
-            System.out.println("Started hbaseApp with mode: " + args[0]);
             try {
-                mode = Integer.parseInt(args[0]);
-                if (mode == 4 && args.length < 2) {
-                    System.out.println("To start the App with mode 4 it is required the mode and the dataFolder");
-                    System.exit(1);
+                int mode = Integer.parseInt(args[0]);
+                if (mode == 4)
+                    getTable(extractLangsSource(args[1]));
+                switch (mode) {
+                    case 1:
+                        firstQuery(args[1], args[2], Integer.parseInt(args[3]), args[4], args[5]);
+                        break;
+                    case 2:
+                        secondQuery(args[1], args[2], Integer.parseInt(args[3]), args[4].split(","), args[5]);
+                        break;
+                    case 3:
+                        thirdQuery(args[1], args[2], Integer.parseInt(args[3]), args[4]);
+                        break;
+                    case 4:
+                        load(args[1]);
+                        break;
                 }
-                if (mode == 2 && args.length != 6) {
-                    System.out.println("To start the App with mode 2 it is required the mode startTS endTS N language outputFolder");
-                    System.exit(1);
-                }
-                if (mode == 3 && args.length != 5) {
-                    System.out.println("To start the App with mode 3 it is required the mode startTS endTS N language outputFolder");
-                    System.exit(1);
-                }
-                if (mode == 1 && args.length != 6) {
-                    System.out.println("To start the App with mode 1 it is required the mode startTS endTS N outputFolder");
-                    System.exit(1);
-                }
-                System.out.println(args.length);
-                System.out.println(mode);
-                App app = new App();
-                System.out.println(app);
 
-                app.start(args, mode);
-                //app.admin.shutdown();
 
             } catch (Exception e) {
                 System.out.println(e.getMessage());
             }
 
         } else {
-            System.out.println("Arguments: mode dataFolder startTS endTS N language outputFolder");
+            System.out.println("[ERROR] - Expected arguments - mode dataFolder startTS endTS N language outputFolder");
             System.exit(1);
         }
 
@@ -97,28 +75,12 @@ public class App {
      * Method to arrange lexicographically and rank results.
      */
     private List<Entry<String, Long>> arrangeMap(Map<String, Long> map) {
+
         Set<Entry<String, Long>> set = map.entrySet();
-        List<Entry<String, Long>> list = new ArrayList<Entry<String, Long>>(set);
+        List<Entry<String, Long>> list = new ArrayList<>(set);
 
-        // lexicographically order
-        Collections.sort(list, new Comparator<Map.Entry<String, Long>>() {
-            Collator c = Collator.getInstance();
+        Collections.sort(list, new HashtagComparator());
 
-            public int compare(Map.Entry<String, Long> o1, Map.Entry<String, Long> o2) {
-                if (c.compare(o2.getKey(), o1.getKey()) == -1)
-                    return 1;
-                else if (c.compare(o2.getKey(), o1.getKey()) == 1)
-                    return -1;
-                else
-                    return 0;
-            }
-        });
-
-        Collections.sort(list, new Comparator<Map.Entry<String, Long>>() {
-            public int compare(Map.Entry<String, Long> o1, Map.Entry<String, Long> o2) {
-                return (o2.getValue()).compareTo(o1.getValue());
-            }
-        });
         return list;
     }
 
@@ -145,23 +107,22 @@ public class App {
 
         Scan scan = new Scan(generateKey(start_timestamp), generateKey(end_timestamp));
         scan.addFamily(Bytes.toBytes(lang));
-        //System.out.println("Get the results");
         ResultScanner rs;
         try {
-            rs = table.getScanner(scan);
+            rs = getTable().getScanner(scan);
             Result res = rs.next();
             if (!query.equals("query3"))
-                intervalTopTopic = new HashMap<String, Long>();
+                setIntervalTopTopic(new HashMap<String, Long>());
             while (res != null && !res.isEmpty()) {
                 byte[] topic_bytes = res.getValue(Bytes.toBytes(lang), Bytes.toBytes("TOPIC"));
                 byte[] count_bytes = res.getValue(Bytes.toBytes(lang), Bytes.toBytes("COUNTS"));
                 String topic = Bytes.toString(topic_bytes).toString();
                 String count = Bytes.toString(count_bytes).toString();
-                intervalTopTopic.put(topic, (long) Integer.parseInt(count));
+                getIntervalTopTopic().put(topic, (long) Integer.parseInt(count));
                 res = rs.next();
             }
             if (!query.equals("query3"))
-                arrangeAndPrint(intervalTopTopic, query, lang, start_timestamp, end_timestamp, out_folder_path, N);
+                arrangeAndPrint(getIntervalTopTopic(), query, lang, start_timestamp, end_timestamp, out_folder_path, N);
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -186,7 +147,7 @@ public class App {
     private void secondQuery(String start_timestamp, String end_timestamp, int N, String[] languages, String outputFolderPath) {
         for (int i = 0; i <= languages.length - 1; i++) {
             try {
-                if (table.getTableDescriptor().hasFamily(Bytes.toBytes(languages[i]))) {
+                if (getTable().getTableDescriptor().hasFamily(Bytes.toBytes(languages[i]))) {
                     executeQuery("query2", start_timestamp, end_timestamp, N, languages[i], outputFolderPath);
                 }
             } catch (IOException e) {
@@ -204,17 +165,18 @@ public class App {
      */
     private void thirdQuery(String start_timestamp, String end_timestamp, int N, String outputFolderPath) {
         //System.out.println("Executing the query3");
-        intervalTopTopic = new HashMap<String, Long>();
+        setIntervalTopTopic(new HashMap<String, Long>());
+        String[] query_languages;
         try {
-            query_languages = new String[table.getTableDescriptor().getColumnFamilies().length];
-            for (int i = 0; i <= table.getTableDescriptor().getColumnFamilies().length - 1; i++) {
-                query_languages[i] = table.getTableDescriptor().getColumnFamilies()[i].getNameAsString();
+            query_languages = new String[getTable().getTableDescriptor().getColumnFamilies().length];
+            for (int i = 0; i <= getTable().getTableDescriptor().getColumnFamilies().length - 1; i++) {
+                query_languages[i] = getTable().getTableDescriptor().getColumnFamilies()[i].getNameAsString();
                 executeQuery("query3", start_timestamp, end_timestamp, N, query_languages[i], outputFolderPath);
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
-        arrangeAndPrint(intervalTopTopic, "query3", null, start_timestamp, end_timestamp, outputFolderPath, N);
+        arrangeAndPrint(getIntervalTopTopic(), "query3", null, start_timestamp, end_timestamp, outputFolderPath, N);
     }
 
     /**
@@ -236,29 +198,27 @@ public class App {
     /**
      * Method to create the table in hbase
      */
-    private void getTable() {
+    private void getTable(String[] languages) {
         System.setProperty("hadoop.home.dir", "/");
         Configuration conf = HBaseConfiguration.create(); // Instantiating configuration class
         conf.set("hbase.zookeeper.quorum", "node2");
-        //conf.addResource(new Path("/home/masteruser1/hbase-0.98.16.1-hadoop2/conf/hbase-site.xml"));
+        HBaseAdmin admin;
+        String thisTable = "ttt";
         try {
             admin = new HBaseAdmin(conf);
-            if (!admin.tableExists(current_table)) {// Execute the table through admin
-                //System.out.println("Creating table in hbase");
+            if (!admin.tableExists(thisTable)) {// Execute the table through admin
                 // Instantiating table descriptor class
-                HTableDescriptor tableDescriptor = new HTableDescriptor(TableName.valueOf(current_table));
+                HTableDescriptor tableDescriptor = new HTableDescriptor(TableName.valueOf(thisTable));
                 // Adding column families to table descriptor
-                for (int i = 0; i < all_languages.length; i++) {
-                    tableDescriptor.addFamily(new HColumnDescriptor(all_languages[i]));
+                for (int i = 0; i < languages.length; i++) {
+                    tableDescriptor.addFamily(new HColumnDescriptor(languages[i]));
                 }
                 admin.createTable(tableDescriptor);
                 HConnection conn = HConnectionManager.createConnection(conf);
-                table = new HTable(TableName.valueOf(current_table), conn);
-                //System.out.println("Table created: "  + table.getName());
+                setTable(new HTable(TableName.valueOf(thisTable), conn));
             } else {
                 HConnection conn = HConnectionManager.createConnection(conf);
-                table = new HTable(TableName.valueOf(current_table), conn);
-                //System.out.println("Table opened: " + table.getName());
+                setTable(new HTable(TableName.valueOf(thisTable), conn));
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -269,17 +229,16 @@ public class App {
      * Method to insert rows into the hbase table
      */
     private void insertIntoTable(String timestamp, String lang, String hashtag, String counts, int topic_pos) {
-        //System.out.println("Inserting into table with key: " + timestamp + ", " + lang + ", " + topic_pos);
         byte[] key = generateKey(timestamp, lang, Integer.toString(topic_pos));
         Get get = new Get(key);
         Result res;
         try {
-            res = table.get(get);
+            res = getTable().get(get);
             if (res != null) { // insert in table
                 Put put = new Put(key);
                 put.add(Bytes.toBytes(lang), Bytes.toBytes("TOPIC"), Bytes.toBytes(hashtag));
                 put.add(Bytes.toBytes(lang), Bytes.toBytes("COUNTS"), Bytes.toBytes(counts));
-                table.put(put);
+                getTable().put(put);
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -328,7 +287,7 @@ public class App {
      * Method to store the results of the query in a file
      */
     private void writeInOutputFile(String query, String language, int position, String word, String startTS, String endTS, String out_folder_path, String frecuency) {
-        File file = new File(out_folder_path + "/" + ID + "_" + query + ".out");
+        File file = new File(out_folder_path + "/09_" + query + ".out");
         String content;
         if (query.equals("query3"))
             content = position + ", " + word + ", " + frecuency + ", " + startTS + ", " + endTS;
@@ -349,32 +308,19 @@ public class App {
         // System.out.println("Write done");
     }
 
-    /**
-     * Method to start the hbase app with the selected query
-     *
-     * @param mode Mode to start the app. Mode 1 reads from file. Mode 2 reads from twitter API.
-     */
-    private void start(String[] args, int mode) {
-        current_table = "TopTopic1";
-        if (mode == 4)
-            all_languages = extractLangsSource(args[1]);
+    public HTable getTable() {
+        return table;
+    }
 
-        System.out.println("HELLO");
+    public void setTable(HTable table) {
+        this.table = table;
+    }
 
-        getTable();
-        switch (mode) {
-            case 1:
-                firstQuery(args[1], args[2], Integer.parseInt(args[3]), args[4], args[5]);
-                break;
-            case 2:
-                secondQuery(args[1], args[2], Integer.parseInt(args[3]), args[4].split(","), args[5]);
-                break;
-            case 3:
-                thirdQuery(args[1], args[2], Integer.parseInt(args[3]), args[4]);
-                break;
-            case 4:
-                load(args[1]);
-                break;
-        }
+    public Map<String, Long> getIntervalTopTopic() {
+        return intervalTopTopic;
+    }
+
+    public void setIntervalTopTopic(Map<String, Long> intervalTopTopic) {
+        this.intervalTopTopic = intervalTopTopic;
     }
 }
