@@ -15,10 +15,10 @@ import java.util.Map.Entry;
 
 
 public class App {
-    private HTable table;
-    private Map<String, Long> counters;
+    private static HTable table;
+    private static Map<String, Long> counters;
 
-    public void main(String[] args) {
+    public static void main(String[] args) {
         if (args.length > 0) {
             try {
                 int mode = Integer.parseInt(args[0]);
@@ -54,7 +54,7 @@ public class App {
     /**
      * Method to generate the structure of the key
      */
-    private byte[] generateKey(String timestamp) {
+    private static byte[] generateKey(String timestamp) {
         byte[] key = new byte[44];
         System.arraycopy(Bytes.toBytes(timestamp), 0, key, 0, timestamp.length());
         return key;
@@ -63,7 +63,7 @@ public class App {
     /**
      * Method to generate the structure of the key
      */
-    private byte[] generateKey(String timestamp, String lang, String topic_pos) {
+    private static byte[] generateKey(String timestamp, String lang, String topic_pos) {
         byte[] key = new byte[44];
         System.arraycopy(Bytes.toBytes(timestamp), 0, key, 0, timestamp.length());
         System.arraycopy(Bytes.toBytes(lang), 0, key, 20, lang.length());
@@ -76,7 +76,7 @@ public class App {
     /**
      * Method to arrange and print the query result
      */
-    private void arrangeAndPrint(Map<String, Long> intervalTopTopic, String query, String lang, String start_timestamp, String end_timestamp, String output_folder, int N) {
+    private static void arrangeAndPrint(Map<String, Long> intervalTopTopic, String query, String lang, String start_timestamp, String end_timestamp, String output_folder, int N) {
         // Process the results and print them
         Set<Entry<String, Long>> set = intervalTopTopic.entrySet();
         List<Entry<String, Long>> list = new ArrayList<>(set);
@@ -91,7 +91,7 @@ public class App {
         }
     }
 
-    private void executeQuery(String query, String start_timestamp, String end_timestamp, int N, String lang, String out_folder_path) {
+    private static void executeQuery(String query, String start_timestamp, String end_timestamp, int N, String lang, String out_folder_path) {
         System.out.println("Executing the " + query);
 
         Scan scan = new Scan(generateKey(start_timestamp), generateKey(end_timestamp));
@@ -124,7 +124,7 @@ public class App {
      * a time interval defined with a start and end timestamp. Start and end timestamp are
      * in milliseconds.
      */
-    private void firstQuery(String start_timestamp, String end_timestamp, int N, String language, String outputFolderPath) {
+    private static void firstQuery(String start_timestamp, String end_timestamp, int N, String language, String outputFolderPath) {
         executeQuery("query1", start_timestamp, end_timestamp, N, language, outputFolderPath);
     }
 
@@ -133,7 +133,7 @@ public class App {
      * Do find the list of Top-N most used words for each language in a time interval defined
      * with the provided start and end timestamp. Start and end timestamp are in milliseconds.
      */
-    private void secondQuery(String start_timestamp, String end_timestamp, int N, String[] languages, String outputFolderPath) {
+    private static void secondQuery(String start_timestamp, String end_timestamp, int N, String[] languages, String outputFolderPath) {
         for (int i = 0; i <= languages.length - 1; i++) {
             try {
                 if (getTable().getTableDescriptor().hasFamily(Bytes.toBytes(languages[i]))) {
@@ -152,7 +152,7 @@ public class App {
      * language in a time interval defined with the provided start and end timestamp. Start
      * and end timestamp are in milliseconds.
      */
-    private void thirdQuery(String start_timestamp, String end_timestamp, int N, String outputFolderPath) {
+    private static void thirdQuery(String start_timestamp, String end_timestamp, int N, String outputFolderPath) {
         setCounters(new HashMap<String, Long>());
         String[] query_languages;
         try {
@@ -170,7 +170,7 @@ public class App {
     /**
      * Method to extract languages from the data source
      */
-    private String[] extractLangsSource(String dataFolder) {
+    private static String[] extractLangsSource(String dataFolder) {
         File folder = new File(dataFolder);
         File[] listOfFiles = folder.listFiles();
         assert listOfFiles != null;
@@ -188,7 +188,7 @@ public class App {
     /**
      * Method to create the table in hbase
      */
-    private void getTable(String[] languages) {
+    private static void getTable(String[] languages) {
         System.setProperty("hadoop.home.dir", "/");
         Configuration conf = HBaseConfiguration.create(); // Instantiating configuration class
         conf.set("hbase.zookeeper.quorum", "node2");
@@ -218,7 +218,7 @@ public class App {
     /**
      * Method to insert rows into the hbase table
      */
-    private void insertIntoTable(String timestamp, String lang, String hashtag, String counts, int topic_pos) {
+    private static void insertIntoTable(String timestamp, String lang, String hashtag, String counts, int topic_pos) {
         byte[] key = generateKey(timestamp, lang, Integer.toString(topic_pos));
         Get get = new Get(key);
         Result res;
@@ -238,7 +238,7 @@ public class App {
     /**
      * Method to load the files in Hbase
      */
-    private void load(String dataFolder) {
+    private static void load(String dataFolder) {
         File folder = new File(dataFolder);
         File[] listOfFiles = folder.listFiles();
         assert listOfFiles != null;
@@ -268,7 +268,7 @@ public class App {
     /**
      * Method to store the results of the query in a file
      */
-    private void writeInOutputFile(String query, String language, int position, String word, String startTS, String endTS, String out_folder_path, String frecuency) {
+    private static void writeInOutputFile(String query, String language, int position, String word, String startTS, String endTS, String out_folder_path, String frecuency) {
         File file = new File(out_folder_path + "/09_" + query + ".out");
         String content;
         if (query.equals("query3"))
@@ -287,19 +287,19 @@ public class App {
         }
     }
 
-    private HTable getTable() {
+    private static HTable getTable() {
         return table;
     }
 
-    private void setTable(HTable table) {
-        this.table = table;
+    private static void setTable(HTable table) {
+        App.table = table;
     }
 
-    private Map<String, Long> getCounters() {
+    private static Map<String, Long> getCounters() {
         return counters;
     }
 
-    private void setCounters(Map<String, Long> counters) {
-        this.counters = counters;
+    private static void setCounters(Map<String, Long> counters) {
+        App.counters = counters;
     }
 }
