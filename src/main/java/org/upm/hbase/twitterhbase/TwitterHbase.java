@@ -173,9 +173,6 @@ public class TwitterHbase {
                                 for (Map.Entry<String, Integer> entry : list) {
                                     File file = new File(getOutputFolder() + "/09_query2.out");
                                     String line = getLanguages()[i] + ", " + position + ", " + entry.getKey() + ", " + getStartTS() + ", " + getEndTS();
-
-                                    System.out.println(">>>>>> ENTRY >>>>>>>> WORD: " + entry.getKey() + "  COUNT: " + entry.getValue());
-
                                     BufferedWriter bw;
                                     try {
                                         bw = new BufferedWriter(new FileWriter(file, true));
