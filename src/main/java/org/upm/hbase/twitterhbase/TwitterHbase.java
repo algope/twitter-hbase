@@ -53,7 +53,6 @@ public class TwitterHbase {
 
     public void run(int mode) {
         setTableName("twitterStats");
-        System.setProperty("hadoop.home.dir", "/");
         Configuration conf = HBaseConfiguration.create();
         String[] hostip = getZhosts().split(":");
         conf.set("hbase.zookeeper.quorum", hostip[0]);
@@ -64,7 +63,7 @@ public class TwitterHbase {
             admin = new HBaseAdmin(conf);
             if (!admin.tableExists(TableName.valueOf(getTableName()))) {
                 System.out.println("[INFO] - Creating table in HBase");
-
+                System.out.println("[INFO] - Languages: "+Arrays.toString(languages));
                 HTableDescriptor tableDescriptor = new HTableDescriptor(TableName.valueOf(getTableName()));
                 for (String language : languages) {
                     System.out.println("[INFO] - Creating column family for language: " + language);
@@ -174,9 +173,6 @@ public class TwitterHbase {
                                 for (Map.Entry<String, Integer> entry : list) {
                                     File file = new File(getOutputFolder() + "/09_query2.out");
                                     String line = getLanguages()[i] + ", " + position + ", " + entry.getKey() + ", " + getStartTS() + ", " + getEndTS();
-
-                                    System.out.println(">>>>>> ENTRY >>>>>>>> WORD: " + entry.getKey() + "  COUNT: " + entry.getValue());
-
                                     BufferedWriter bw;
                                     try {
                                         bw = new BufferedWriter(new FileWriter(file, true));

@@ -12,8 +12,8 @@ public class HashtagComparator implements Comparator<Map.Entry<String, Integer>>
     public int compare(Map.Entry<String, Integer> o1, Map.Entry<String, Integer> o2) {
         return ComparisonChain.start()
                 //.compare(o1.getKey(), o2.getKey(), Ordering.natural().reverse())
-                .compare(o2.getValue(), o1.getValue())
-                .compare(o1.getKey(), o2.getKey())
+                .compare(o1.getValue(), o2.getValue(), Ordering.natural().reverse())
+                .compare(o1.getKey(), o2.getKey(), String.CASE_INSENSITIVE_ORDER)
                 .result();
     }
 }
