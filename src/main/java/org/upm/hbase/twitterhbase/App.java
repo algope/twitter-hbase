@@ -15,35 +15,119 @@ import java.util.Map.Entry;
 
 
 public class App {
-    private static HTable table;
-    private static Map<String, Long> counters;
+    private HTable table;
+    private String tableName;
+    private Map<String, Long> counters;
+    private int mode;
+    private String zhosts;
+    private long startTS;
+    private long endTS;
+    private int n;
+    private String[] languages;
+    private String dataFolder;
+    private String outputFolder;
+
+    public App(int mode, String zhosts, long startTS, long endTS, int n, String[] languages, String outputFolder) {
+        this.mode = mode;
+        this.zhosts = zhosts;
+        this.startTS = startTS;
+        this.endTS = endTS;
+        this.n = n;
+        this.languages = languages;
+        this.outputFolder = outputFolder;
+    }
+
+    public App(int mode, String zhosts, long startTS, long endTS, int n, String outputFolder) {
+        this.mode = mode;
+        this.zhosts = zhosts;
+        this.startTS = startTS;
+        this.endTS = endTS;
+        this.n = n;
+        this.outputFolder = outputFolder;
+    }
+
+    public App(int mode, String zhosts, String dataFolder, String[] languages) {
+        this.mode = mode;
+        this.zhosts = zhosts;
+        this.dataFolder = dataFolder;
+        this.languages = languages;
+    }
 
     public static void main(String[] args) {
+        App hbaseapp = null;
+        System.out.println("----------------------------------------");
+        System.out.println("----------------------------------------");
+        System.out.println("--- Welcome to the twitter-hbase app ---");
+        System.out.println("----------------------------------------");
+        System.out.println("");
+
+
         if (args.length > 0) {
-            try {
-                int mode = Integer.parseInt(args[0]);
-                if (mode == 4)
-                    getTable(extractLangsSource(args[1]));
-                switch (mode) {
-                    case 1:
-                        firstQuery(args[1], args[2], Integer.parseInt(args[3]), args[4], args[5]);
-                        break;
-                    case 2:
-                        secondQuery(args[1], args[2], Integer.parseInt(args[3]), args[4].split(","), args[5]);
-                        break;
-                    case 3:
-                        thirdQuery(args[1], args[2], Integer.parseInt(args[3]), args[4]);
-                        break;
-                    case 4:
-                        load(args[1]);
-                        break;
+
+            int mode = Integer.parseInt(args[0]);
+
+            switch (mode) {
+                case 1: {//mode ZKHOST: ZKPORT startTS endTS N language outputFolder
+                    System.out.println("---Starting with parameters: -----------");
+                    System.out.println("  --Mode: " + args[0]);
+                    System.out.println("  --zkHost: " + args[1]);
+                    System.out.println("  --startTS: " + args[2]);
+                    System.out.println("  --endTS: " + args[3]);
+                    System.out.println("  --N: " + args[4]);
+                    System.out.println("  --Languages: " + args[5]);
+                    System.out.println("  --outputFolder: " + args[6]);
+                    hbaseapp = new App(mode, args[1], Long.parseLong(args[2]), Long.parseLong(args[3]), Integer.parseInt(args[4]), args[5].split(","), args[6]);
+                    hbaseapp.run(mode);
+                    break;
                 }
-
-
-            } catch (Exception e) {
-                System.out.println(e.getMessage());
+                case 2: {//mode ZKHOST: ZKPORT startTS endTS N language outputFolder
+                    System.out.println("---Starting with parameters: -----------");
+                    System.out.println("  --Mode: " + args[0]);
+                    System.out.println("  --zkHost: " + args[1]);
+                    System.out.println("  --startTS: " + args[2]);
+                    System.out.println("  --endTS: " + args[3]);
+                    System.out.println("  --N: " + args[4]);
+                    System.out.println("  --Languages: " + args[5]);
+                    System.out.println("  --outputFolder: " + args[6]);
+                    hbaseapp = new App(mode, args[1], Long.parseLong(args[2]), Long.parseLong(args[3]), Integer.parseInt(args[4]), args[5].split(","), args[6]);
+                    hbaseapp.run(mode);
+                    break;
+                }
+                case 3: {//mode ZKHOST: ZKPORT startTS endTS N outputFolder
+                    System.out.println("---Starting with parameters: -----------");
+                    System.out.println("  --Mode: " + args[0]);
+                    System.out.println("  --zkHost: " + args[1]);
+                    System.out.println("  --startTS: " + args[2]);
+                    System.out.println("  --endTS: " + args[3]);
+                    System.out.println("  --N: " + args[4]);
+                    System.out.println("  --outputFolder: " + args[5]);
+                    hbaseapp = new App(mode, args[1], Long.parseLong(args[2]), Long.parseLong(args[3]), Integer.parseInt(args[4]), args[5]);
+                    hbaseapp.run(mode);
+                    break;
+                }
+                case 4: {//mode ZKHOST:ZKPORT dataFolder
+                    System.out.println("---Starting with parameters: -----------");
+                    System.out.println("  --Mode: " + args[0]);
+                    System.out.println("  --zkHost: " + args[1]);
+                    System.out.println("  --dataFolder: " + args[2]);
+                    File folder = new File(args[2]);
+                    File[] listOfFiles = folder.listFiles();
+                    assert listOfFiles != null;
+                    String [] langs = new String[listOfFiles.length];
+                    for (int i = 0; i < listOfFiles.length; i++) {
+                        File file = listOfFiles[i];
+                        if (file.isFile() && file.getName().endsWith(".out")) {
+                            langs[i]=file.getName().split(".out")[0];
+                        }
+                    }
+                    hbaseapp = new App(mode, args[1], args[2], langs);
+                    hbaseapp.run(mode);
+                    break;
+                }
+                default: {
+                    System.out.println("[ERROR] - wrong mode");
+                }
             }
-
         } else {
             System.out.println("[ERROR] - Expected arguments - mode dataFolder startTS endTS N language outputFolder");
             System.exit(1);
@@ -51,10 +135,62 @@ public class App {
 
     }
 
+    private void run(int mode) {
+        setTableName("twitterStats");
+        System.setProperty("hadoop.home.dir", "/");
+        Configuration conf = HBaseConfiguration.create(); // Instantiating configuration class
+        String[] hostip = getZhosts().split(":");
+        conf.set("hbase.zookeeper.quorum", hostip[0]);
+        conf.set("hbase.zookeeper.property.clientPort", hostip[1]);
+        HBaseAdmin admin;
+        try {
+            admin = new HBaseAdmin(conf);
+            if (!admin.tableExists(TableName.valueOf(getTableName()))) {
+                System.out.println("[INFO] - Creating table in HBase");
+
+                HTableDescriptor tableDescriptor = new HTableDescriptor(TableName.valueOf(getTableName()));
+                for (String language : languages) {
+                    System.out.println("[INFO] - Creating column family for language: "+language);
+                    tableDescriptor.addFamily(new HColumnDescriptor(language));
+                }
+                admin.createTable(tableDescriptor);
+                HConnection conn = HConnectionManager.createConnection(conf);
+                setTable(new HTable(TableName.valueOf(getTableName()), conn));
+                System.out.println("[INFO] - HBase table created");
+            } else {
+                HConnection conn = HConnectionManager.createConnection(conf);
+                setTable(new HTable(TableName.valueOf(getTableName()), conn));
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+//        if(mode==4){
+//            load(getDataFolder());
+//        }
+
+        //getTable();
+        switch (mode) {
+            case 1: {
+                break;
+            }
+            case 2: {
+                break;
+            }
+            case 3: {
+                break;
+            }
+            case 4: {
+                break;
+            }
+        }
+
+
+    }
+
     /**
      * Method to generate the structure of the key
      */
-    private static byte[] generateKey(String timestamp) {
+    private byte[] generateKey(String timestamp) {
         byte[] key = new byte[44];
         System.arraycopy(Bytes.toBytes(timestamp), 0, key, 0, timestamp.length());
         return key;
@@ -70,7 +206,6 @@ public class App {
         System.arraycopy(Bytes.toBytes(topic_pos), 0, key, 20, topic_pos.length());
         return key;
     }
-
 
 
     /**
@@ -91,7 +226,7 @@ public class App {
         }
     }
 
-    private static void executeQuery(String query, String start_timestamp, String end_timestamp, int N, String lang, String out_folder_path) {
+    private void executeQuery(String query, String start_timestamp, String end_timestamp, int N, String lang, String out_folder_path) {
         System.out.println("Executing the " + query);
 
         Scan scan = new Scan(generateKey(start_timestamp), generateKey(end_timestamp));
@@ -124,7 +259,7 @@ public class App {
      * a time interval defined with a start and end timestamp. Start and end timestamp are
      * in milliseconds.
      */
-    private static void firstQuery(String start_timestamp, String end_timestamp, int N, String language, String outputFolderPath) {
+    private void firstQuery(String start_timestamp, String end_timestamp, int N, String language, String outputFolderPath) {
         executeQuery("query1", start_timestamp, end_timestamp, N, language, outputFolderPath);
     }
 
@@ -133,7 +268,7 @@ public class App {
      * Do find the list of Top-N most used words for each language in a time interval defined
      * with the provided start and end timestamp. Start and end timestamp are in milliseconds.
      */
-    private static void secondQuery(String start_timestamp, String end_timestamp, int N, String[] languages, String outputFolderPath) {
+    private void secondQuery(String start_timestamp, String end_timestamp, int N, String[] languages, String outputFolderPath) {
         for (int i = 0; i <= languages.length - 1; i++) {
             try {
                 if (getTable().getTableDescriptor().hasFamily(Bytes.toBytes(languages[i]))) {
@@ -152,7 +287,7 @@ public class App {
      * language in a time interval defined with the provided start and end timestamp. Start
      * and end timestamp are in milliseconds.
      */
-    private static void thirdQuery(String start_timestamp, String end_timestamp, int N, String outputFolderPath) {
+    private void thirdQuery(String start_timestamp, String end_timestamp, int N, String outputFolderPath) {
         setCounters(new HashMap<String, Long>());
         String[] query_languages;
         try {
@@ -167,94 +302,54 @@ public class App {
         arrangeAndPrint(getCounters(), "query3", null, start_timestamp, end_timestamp, outputFolderPath, N);
     }
 
-    /**
-     * Method to extract languages from the data source
-     */
-    private static String[] extractLangsSource(String dataFolder) {
-        File folder = new File(dataFolder);
-        File[] listOfFiles = folder.listFiles();
-        assert listOfFiles != null;
-        String[] langs = new String[listOfFiles.length];
-        for (int i = 0; i < listOfFiles.length; i++) {
-            File file;
-            file = listOfFiles[i];
-            if (file.isFile() && file.getName().endsWith(".out")) {
-                langs[i] = file.getName().split(".out")[0];
-            }
-        }
-        return langs;
-    }
 
-    /**
-     * Method to create the table in hbase
-     */
-    private static void getTable(String[] languages) {
-        System.setProperty("hadoop.home.dir", "/");
-        Configuration conf = HBaseConfiguration.create(); // Instantiating configuration class
-        conf.set("hbase.zookeeper.quorum", "node2");
-        HBaseAdmin admin;
-        String thisTable = "ttt";
-        try {
-            admin = new HBaseAdmin(conf);
-            if (!admin.tableExists(thisTable)) {// Execute the table through admin
-                // Instantiating table descriptor class
-                HTableDescriptor tableDescriptor = new HTableDescriptor(TableName.valueOf(thisTable));
-                // Adding column families to table descriptor
-                for (String language : languages) {
-                    tableDescriptor.addFamily(new HColumnDescriptor(language));
-                }
-                admin.createTable(tableDescriptor);
-                HConnection conn = HConnectionManager.createConnection(conf);
-                setTable(new HTable(TableName.valueOf(thisTable), conn));
-            } else {
-                HConnection conn = HConnectionManager.createConnection(conf);
-                setTable(new HTable(TableName.valueOf(thisTable), conn));
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
+//    private String[] getData() {
+//        File folder = new File(getDataFolder());
+//        File[] listOfFiles = folder.listFiles();
+//        assert listOfFiles != null;
+//        String[] langs = new String[listOfFiles.length];
+//        for (int i = 0; i < listOfFiles.length; i++) {
+//            File file;
+//            file = listOfFiles[i];
+//            if (file.isFile() && file.getName().endsWith(".out")) {
+//                langs[i] = file.getName().split(".out")[0];
+//            }
+//        }
+//        return langs;
+//    }
 
-    /**
-     * Method to insert rows into the hbase table
-     */
-    private static void insertIntoTable(String timestamp, String lang, String hashtag, String counts, int topic_pos) {
-        byte[] key = generateKey(timestamp, lang, Integer.toString(topic_pos));
-        Get get = new Get(key);
-        Result res;
-        try {
-            res = getTable().get(get);
-            if (res != null) { // insert in table
-                Put put = new Put(key);
-                put.add(Bytes.toBytes(lang), Bytes.toBytes("TOPIC"), Bytes.toBytes(hashtag));
-                put.add(Bytes.toBytes(lang), Bytes.toBytes("COUNTS"), Bytes.toBytes(counts));
-                getTable().put(put);
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
 
     /**
      * Method to load the files in Hbase
      */
-    private static void load(String dataFolder) {
+    private void load(String dataFolder) {
         File folder = new File(dataFolder);
         File[] listOfFiles = folder.listFiles();
         assert listOfFiles != null;
         for (File file : listOfFiles)
             if (file.isFile() && file.getName().endsWith(".out")) {
-
                 try (BufferedReader br = new BufferedReader(new FileReader(file))) {
                     for (String line; (line = br.readLine()) != null; ) {
-                        // process line by line
                         String[] fields = line.split(",");
                         String timestamp = fields[0];
                         String lang = fields[1];
                         int pos = 2;
                         int topic_pos = 1;
                         while (pos < fields.length) {
-                            insertIntoTable(timestamp, lang, fields[pos++], fields[pos++], topic_pos);
+                            byte[] key = generateKey(timestamp, lang, Integer.toString(topic_pos));
+                            Get get = new Get(key);
+                            Result res;
+                            try {
+                                res = getTable().get(get);
+                                if (res != null) { // insert in table
+                                    Put put = new Put(key);
+                                    put.add(Bytes.toBytes(lang), Bytes.toBytes("TOPIC"), Bytes.toBytes(fields[pos++]));
+                                    put.add(Bytes.toBytes(lang), Bytes.toBytes("COUNTS"), Bytes.toBytes(fields[pos++]));
+                                    getTable().put(put);
+                                }
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
                             topic_pos++;
                         }
                     }
@@ -287,19 +382,92 @@ public class App {
         }
     }
 
-    private static HTable getTable() {
+    private HTable getTable() {
         return table;
     }
 
-    private static void setTable(HTable table) {
-        App.table = table;
+    private void setTable(HTable table) {
+        this.table = table;
     }
 
-    private static Map<String, Long> getCounters() {
+    private Map<String, Long> getCounters() {
         return counters;
     }
 
-    private static void setCounters(Map<String, Long> counters) {
-        App.counters = counters;
+    private void setCounters(Map<String, Long> counters) {
+        this.counters = counters;
     }
+
+    public int getMode() {
+        return mode;
+    }
+
+    public void setMode(int mode) {
+        this.mode = mode;
+    }
+
+    public String getZhosts() {
+        return zhosts;
+    }
+
+    public void setZhosts(String zhosts) {
+        this.zhosts = zhosts;
+    }
+
+    public long getStartTS() {
+        return startTS;
+    }
+
+    public void setStartTS(long startTS) {
+        this.startTS = startTS;
+    }
+
+    public long getEndTS() {
+        return endTS;
+    }
+
+    public void setEndTS(long endTS) {
+        this.endTS = endTS;
+    }
+
+    public int getN() {
+        return n;
+    }
+
+    public void setN(int n) {
+        this.n = n;
+    }
+
+    public String[] getLanguages() {
+        return languages;
+    }
+
+    public void setLanguages(String[] languages) {
+        this.languages = languages;
+    }
+
+    public String getDataFolder() {
+        return dataFolder;
+    }
+
+    public void setDataFolder(String dataFolder) {
+        this.dataFolder = dataFolder;
+    }
+
+    public String getOutputFolder() {
+        return outputFolder;
+    }
+
+    public void setOutputFolder(String outputFolder) {
+        this.outputFolder = outputFolder;
+    }
+
+    public String getTableName() {
+        return tableName;
+    }
+
+    public void setTableName(String tableName) {
+        this.tableName = tableName;
+    }
+
 }
